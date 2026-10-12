@@ -1,0 +1,98 @@
+name: Android APK (personal test builds)
+
+on:
+  push:
+    branches:
+      - master
+      - 'feature/**'
+      - 'ci/**'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build installable debug and dev APKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle and dependency cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Verify build environment
+        run: |
+          java -version
+          git submodule status
+          chmod +x ./gradlew
+          ./gradlew --version
+
+      # Debug APK uses the stock package ID and cannot be installed over an
+      # official Metrodroid APK signed with a different certificate.
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrodroid-debug-${{ github.sha }}
+          path: build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      # Existing "dev" build type has applicationIdSuffix '.dev', so it
+      # installs beside stock Metrodroid. It is debug-signed, NOT a release.
+      - name: Build side-by-side dev APK
+        run: ./gradlew assembleDev --no-daemon --stacktrace --max-workers=2
+
+      - name: Upload dev APK (recommended for phone testing)
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrodroid-dev-${{ github.sha }}
+          path: build/outputs/apk/dev/*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Installation instructions
+        if: success()
+        run: |
+          {
+            echo "## Android APKs are ready"
+            echo ""
+            echo "Download the **metrodroid-dev** artifact to test alongside the official app."
+            echo "Extract the artifact ZIP, then install the contained APK on Android."
+            echo "The dev build uses an `.dev` application ID suffix and a temporary debug signing certificate."
+            echo "The **metrodroid-debug** artifact uses the original application ID and may conflict with an existing installation."
+            echo ""
+            echo "Commit: \`${GITHUB_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
