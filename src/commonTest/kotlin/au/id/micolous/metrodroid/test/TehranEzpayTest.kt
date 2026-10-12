@@ -44,7 +44,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
         assertIs<TehranEzpayTransitData>(data)
         assertEquals("Tehran Ezpay", data.cardName)
         assertEquals("D319460F83", data.serialNumber)
-        assertEquals(TransitCurrency(expectedBalance, "IRR", 1), data.balance)
+        assertEquals(TransitCurrency(expectedBalance, "IRR", 1), data.balances?.single()?.balance)
         assertEquals(expectedCounter, data.recordCounter)
         assertEquals(expectedPreviousBalance, data.previousBalance)
         assertEquals(expectedActiveSector, data.activeBalanceSector)
@@ -64,7 +64,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
         val data = loadCard<ClassicCard>("tehran_ezpay/old-generation.json").parseTransitData()
         assertIs<TehranEzpayTransitData>(data)
         assertEquals("121B852FA3", data.serialNumber)
-        assertEquals(TransitCurrency(449745, "IRR", 1), data.balance)
+        assertEquals(TransitCurrency(449745, "IRR", 1), data.balances?.single()?.balance)
         assertEquals(0x3f, data.recordCounter)
         assertEquals(509245, data.previousBalance)
         assertEquals(5, data.activeBalanceSector)
@@ -75,7 +75,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
 
     @Test
     fun testHeaderAloneIsInsufficient() {
-        val card = loadCard<ClassicCard>("tehran_ezpay/old-generation.json")
+        val card = loadCard<ClassicCard>("tehran_ezpay/old-generation.json").mifareClassic!!
         val headerOnly = card.sectorsRaw[3].blocks[0].dataCopy.also {
             it[2] = 0
             it[3] = 0
@@ -119,7 +119,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
 
     @Test
     fun testRequiredAndOptionalBlocks() {
-        val card = loadCard<ClassicCard>("tehran_ezpay/after-entry.json")
+        val card = loadCard<ClassicCard>("tehran_ezpay/after-entry.json").mifareClassic!!
         // This captured dump already has unread, unrelated blocks in sector 0.
         assertTrue(TehranEzpayTransitFactory.check(card))
 
@@ -127,7 +127,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
         assertTrue(TehranEzpayTransitFactory.check(noJourney))
         val data = noJourney.parseTransitData()
         assertIs<TehranEzpayTransitData>(data)
-        assertEquals(TransitCurrency(587332, "IRR", 1), data.balance)
+        assertEquals(TransitCurrency(587332, "IRR", 1), data.balances?.single()?.balance)
 
         assertFalse(TehranEzpayTransitFactory.check(
                 copyWithBlock(card, 4, 0, ImmutableByteArray.empty())))
@@ -137,7 +137,7 @@ class TehranEzpayTest : CardReaderWithAssetDumpsTest<JsonKotlinFormat>(JsonKotli
 
     @Test
     fun testIdentificationFields() {
-        val card = loadCard<ClassicCard>("tehran_ezpay/before-entry.json")
+        val card = loadCard<ClassicCard>("tehran_ezpay/before-entry.json").mifareClassic!!
         assertEquals("D319460F83", TehranEzpayTransitFactory.parseTransitIdentity(card).serialNumber)
 
         val badBcc = card.sectorsRaw[0].blocks[0].dataCopy.also { it[4] = 0 }
