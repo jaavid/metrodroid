@@ -282,6 +282,9 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
     androidTestImplementation "androidx.test.ext:junit:1.1.3"
     testImplementation 'org.robolectric:robolectric:4.7.3'
+    // Local Android unit tests (Robolectric) use the shared Kotlin test API.
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+    testImplementation 'junit:junit:4.13.2'
 
     lintChecks project(':lintchecks')
 }
@@ -407,6 +410,14 @@ kotlin {
             dependsOn(jvmCommonTest)
         }
 
+        androidUnitTest {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+                implementation 'junit:junit:4.13.2'
+            }
+            // XmlHelper declares the expect used by the Robolectric actual.
+            dependsOn(jvmCommonTest)
+        }
 
         jvmCliTest {
             dependencies {
