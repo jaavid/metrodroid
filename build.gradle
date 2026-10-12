@@ -641,10 +641,10 @@ android {
         dev.initWith(buildTypes.debug)
         dev {
             applicationIdSuffix '.dev'
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                    'proguard.cfg'
+            // Keep personal test builds unminified for reproducible NFC/provider
+            // troubleshooting. Retain R8 shrinking for release builds only.
+            minifyEnabled false
+            shrinkResources false
             matchingFallbacks = ['debug']
         }
         release {
