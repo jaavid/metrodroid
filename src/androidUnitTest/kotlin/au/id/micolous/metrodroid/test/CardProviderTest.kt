@@ -18,11 +18,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.robolectric.annotation.Config
 
 /**
  * Regression for the side-by-side .dev build: its manifest uses a suffixed
  * ContentProvider authority, which must be recognized during card persistence.
  */
+// This regression runs on API 28; newer Robolectric versions no longer
+// emulate every legacy API level listed by the shared test base class.
+@Config(sdk = [28])
 class CardProviderTest : BaseInstrumentedTest() {
     @Test
     fun testInstalledPackageUriMatcher() {
