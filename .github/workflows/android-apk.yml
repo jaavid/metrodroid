@@ -21,6 +21,8 @@ concurrency:
 jobs:
   apk:
     name: Build installable debug and dev APKs
+    # Push already builds same-repository PR branches; avoid duplicate runners.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
@@ -91,7 +93,7 @@ jobs:
             echo ""
             echo "Download the **metrodroid-dev** artifact to test alongside the official app."
             echo "Extract the artifact ZIP, then install the contained APK on Android."
-            echo "The dev build uses an `.dev` application ID suffix and a temporary debug signing certificate."
+            echo 'The dev build uses the .dev application ID suffix and a temporary debug signing certificate.'
             echo "The **metrodroid-debug** artifact uses the original application ID and may conflict with an existing installation."
             echo ""
             echo "Commit: \`${GITHUB_SHA}\`"
