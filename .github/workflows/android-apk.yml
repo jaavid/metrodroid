@@ -81,20 +81,6 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --version
 
-      # Debug APK uses the stock package ID and cannot be installed over an
-      # official Metrodroid APK signed with a different certificate.
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: metrodroid-debug-${{ github.sha }}
-          path: build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
       # Existing "dev" build type has applicationIdSuffix '.dev', so it
       # installs beside stock Metrodroid. It is debug-signed, NOT a release.
       - name: Build side-by-side dev APK
@@ -105,6 +91,23 @@ jobs:
         with:
           name: metrodroid-dev-${{ github.sha }}
           path: build/outputs/apk/dev/*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Verify dev card persistence (Robolectric)
+        run: ./gradlew testDevUnitTest --tests '*CardProviderTest' --no-daemon --stacktrace --max-workers=2
+
+      # Debug APK uses the stock package ID and cannot be installed over an
+      # official Metrodroid APK signed with a different certificate.
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrodroid-debug-${{ github.sha }}
+          path: build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
