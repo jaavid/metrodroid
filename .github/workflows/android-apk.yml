@@ -86,6 +86,25 @@ jobs:
       - name: Build side-by-side dev APK
         run: ./gradlew assembleDev --no-daemon --stacktrace --max-workers=2
 
+      - name: Verify packaged dev provider authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=(build/outputs/apk/dev/*.apk)
+          test -f "${apk[0]}"
+          package_id="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "${apk[0]}" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
+          test -n "$package_id"
+          echo "APK package: $package_id"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "${apk[0]}" AndroidManifest.xml > "$RUNNER_TEMP/dev-manifest.txt"
+          for authority in "$package_id.cardprovider" "$package_id.keyprovider"; do
+            if ! grep 'android:authorities' "$RUNNER_TEMP/dev-manifest.txt" | grep -Fq "$authority"; then
+              echo "::error::Provider authority '$authority' missing from packaged AndroidManifest.xml"
+              grep 'android:authorities' "$RUNNER_TEMP/dev-manifest.txt" || true
+              exit 1
+            fi
+            echo "Verified packaged provider authority: $authority"
+          done
+
       - name: Upload dev APK (recommended for phone testing)
         uses: actions/upload-artifact@v4
         with:
