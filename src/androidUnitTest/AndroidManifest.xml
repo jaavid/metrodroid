@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Robolectric test dependencies target API 19+, while the shipping app
+         intentionally continues to support minSdk 16. This override affects
+         the local unit-test manifest only, never a packaged application APK. -->
+    <uses-sdk tools:overrideLibrary="androidx.test.espresso.idling.resource" />
+</manifest>

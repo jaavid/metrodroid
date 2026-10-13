@@ -2427,6 +2427,15 @@
     <string name="tehran_ezpay_entered">Entered / journey open</string>
     <string name="tehran_ezpay_exited">Exited / journey closed</string>
     <string name="tehran_ezpay_unknown">Unknown (0x%1$s)</string>
+    <string name="tehran_ezpay_previous_balance">Previous stored balance</string>
+    <string name="tehran_ezpay_balance_difference">Balance change between records</string>
+    <string name="tehran_ezpay_active_sector">Active balance sector</string>
+    <string name="tehran_ezpay_previous_counter">Previous record counter</string>
+    <string name="tehran_ezpay_active_metadata">Active record metadata (hex)</string>
+    <string name="tehran_ezpay_previous_metadata">Previous record metadata (hex)</string>
+    <string name="tehran_ezpay_state_block">State block (hex)</string>
+    <string name="tehran_ezpay_journey_block">Journey block (hex)</string>
+    <string name="tehran_ezpay_mirrored_state_block">Mirrored state block (hex)</string>
     <!-- Translators: MCT = MIFARE Classic Tool - an Android MIFARE Classic card reader / writer -->
     <string name="import_mct_file">Import from MCT file</string>
     <string name="subscription_id">Subscription ID</string>

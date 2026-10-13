@@ -1,20 +1,11 @@
-<!-- GoogleAppIndexingWarning triggers because action-view intent-filter
-     is in main AndroidManifest rather than this override.
+<!-- GoogleAppIndexingWarning triggers because the action-view intent-filter
+     lives in the main manifest. The dev variant must not override provider
+     authorities: the main manifest uses ${applicationId} and automatically
+     includes the .dev suffix.
 -->
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="GoogleAppIndexingWarning">
-    <application>
-        <provider
-            android:name="au.id.micolous.metrodroid.provider.CardProvider"
-            android:authorities="au.id.micolous.metrodroid.dev.cardprovider"
-            android:exported="false"
-            tools:replace="android:authorities"/>
-        <provider
-            android:name="au.id.micolous.metrodroid.provider.CardKeyProvider"
-            android:authorities="au.id.micolous.metrodroid.dev.keyprovider"
-            android:exported="false"
-            tools:replace="android:authorities"/>
-    </application>
+    <application />
 </manifest>

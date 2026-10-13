@@ -66,27 +66,65 @@ private fun requiredBlock(card: ClassicCard, sector: Int, block: Int): Immutable
 private fun serial(card: ClassicCard): String =
         (card.tagId + requiredBlock(card, 0, 0)!![4]).toHexString().uppercase()
 
+private fun journeyStateLabel(state: Int?): String? = when (state) {
+    0 -> Localizer.localizeString(R.string.tehran_ezpay_entered)
+    1 -> Localizer.localizeString(R.string.tehran_ezpay_exited)
+    null -> null
+    else -> Localizer.localizeString(R.string.tehran_ezpay_unknown,
+            state.toString(16).uppercase().padStart(2, '0'))
+}
+
 @Parcelize
 data class TehranEzpayTransitData(private val mSerial: String,
                                   private val mBalance: Int,
                                   internal val recordCounter: Long,
-                                  private val mJourneyState: Int?) : TransitData() {
+                                  private val mJourneyState: Int?,
+                                  internal val previousBalance: Int,
+                                  internal val previousCounter: Long,
+                                  internal val activeBalanceSector: Int,
+                                  private val mActiveMetadata: String,
+                                  private val mPreviousMetadata: String,
+                                  private val mStateBlock: String,
+                                  private val mJourneyBlock: String?,
+                                  private val mMirroredStateBlock: String?) : TransitData() {
     override val serialNumber get() = mSerial
     override val cardName get() = Localizer.localizeString(NAME)
     override val balance get() = TransitCurrency(mBalance, "IRR", 1)
 
+    // Info is visible with the default settings; raw fields are only shown in diagnostic mode.
+    // Neither record should be interpreted as a confirmed journey or station identifier.
+    override val info: List<ListItem>
+        get() = listOfNotNull(
+                journeyStateLabel(mJourneyState)?.let {
+                    ListItem(R.string.tehran_ezpay_journey_state, it)
+                },
+                ListItem(R.string.tehran_ezpay_previous_balance,
+                        TransitCurrency(previousBalance, "IRR", 1)
+                                .maybeObfuscateBalance().formatCurrencyString(true)),
+                ListItem(R.string.tehran_ezpay_balance_difference,
+                        TransitCurrency(mBalance - previousBalance, "IRR", 1)
+                                .maybeObfuscateBalance().formatCurrencyString(false)))
+
     override fun getRawFields(level: RawLevel): List<ListItem> {
-        val state = when (mJourneyState) {
-            0 -> Localizer.localizeString(R.string.tehran_ezpay_entered)
-            1 -> Localizer.localizeString(R.string.tehran_ezpay_exited)
-            null -> null
-            else -> Localizer.localizeString(R.string.tehran_ezpay_unknown,
-                    mJourneyState.toString(16).uppercase().padStart(2, '0'))
-        }
+        val state = journeyStateLabel(mJourneyState)
         return listOf(ListItem(R.string.tehran_ezpay_record_counter,
                 "$recordCounter (0x${recordCounter.toString(16).uppercase()})")) +
-                if (state == null) emptyList() else listOf(
-                        ListItem(R.string.tehran_ezpay_journey_state, state))
+                (if (state == null) emptyList() else listOf(
+                        ListItem(R.string.tehran_ezpay_journey_state, state))) +
+                listOf(
+                        ListItem(R.string.tehran_ezpay_active_sector, activeBalanceSector.toString()),
+                        ListItem(R.string.tehran_ezpay_previous_counter,
+                                "$previousCounter (0x${previousCounter.toString(16).uppercase()})"),
+                        ListItem(R.string.tehran_ezpay_active_metadata, mActiveMetadata),
+                        ListItem(R.string.tehran_ezpay_previous_metadata, mPreviousMetadata),
+                        ListItem(R.string.tehran_ezpay_state_block, mStateBlock)) +
+                listOfNotNull(
+                        mJourneyBlock?.let {
+                            ListItem(R.string.tehran_ezpay_journey_block, it)
+                        },
+                        mMirroredStateBlock?.let {
+                            ListItem(R.string.tehran_ezpay_mirrored_state_block, it)
+                        })
     }
 }
 
@@ -121,15 +159,29 @@ object TehranEzpayTransitFactory : ClassicCardTransitFactory {
             TransitIdentity(NAME, serial(card))
 
     override fun parseTransitData(card: ClassicCard): TehranEzpayTransitData {
-        val record = selectTehranEzpayRecord(
-                parseTehranEzpayRecord(requiredBlock(card, 4, 0)!!)!!,
-                parseTehranEzpayRecord(requiredBlock(card, 5, 0)!!)!!)
-        val journeyState = requiredBlock(card, 3, 1)?.get(0)?.toInt()?.and(0xff)
-        // Based conservatively on three sequential before-entry, after-entry and after-exit samples.
+        val rawA = requiredBlock(card, 4, 0)!!
+        val rawB = requiredBlock(card, 5, 0)!!
+        val first = parseTehranEzpayRecord(rawA)!!
+        val second = parseTehranEzpayRecord(rawB)!!
+        val secondIsNewest = isTehranEzpayCounterNewer(second.counter, first.counter)
+        val record = if (secondIsNewest) second else first
+        val previous = if (secondIsNewest) first else second
+        val activeRaw = if (secondIsNewest) rawB else rawA
+        val previousRaw = if (secondIsNewest) rawA else rawB
+        val journeyBlock = requiredBlock(card, 3, 1)
+        // Only expose confirmed fields as decoded data. Keep unknown bytes as diagnostic hex.
         return TehranEzpayTransitData(
                 mSerial = serial(card),
                 mBalance = record.balance,
                 recordCounter = record.counter,
-                mJourneyState = journeyState)
+                mJourneyState = journeyBlock?.get(0)?.toInt()?.and(0xff),
+                previousBalance = previous.balance,
+                previousCounter = previous.counter,
+                activeBalanceSector = if (secondIsNewest) 5 else 4,
+                mActiveMetadata = activeRaw.sliceOffLen(8, 8).toHexString().uppercase(),
+                mPreviousMetadata = previousRaw.sliceOffLen(8, 8).toHexString().uppercase(),
+                mStateBlock = requiredBlock(card, 3, 0)!!.toHexString().uppercase(),
+                mJourneyBlock = journeyBlock?.toHexString()?.uppercase(),
+                mMirroredStateBlock = requiredBlock(card, 15, 1)?.toHexString()?.uppercase())
     }
 }

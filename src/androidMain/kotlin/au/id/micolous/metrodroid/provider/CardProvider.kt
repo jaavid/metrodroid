@@ -38,15 +38,21 @@ import au.id.micolous.farebot.BuildConfig
 class CardProvider : ContentProvider() {
 
     private var mDbHelper: CardDBHelper? = null
+    private lateinit var mUriMatcher: UriMatcher
 
     override fun onCreate(): Boolean {
-        mDbHelper = CardDBHelper(context!!)
+        val appContext = requireNotNull(context)
+        // The manifest registers "${applicationId}.cardprovider". In particular,
+        // the side-by-side dev build has a different package name from release.
+        // Match the installed package, not a possibly stale build-time ID.
+        mUriMatcher = createUriMatcher(appContext.packageName + ".cardprovider")
+        mDbHelper = CardDBHelper(appContext)
         return true
     }
 
     override fun query(@NonNls uri: Uri, projection: Array<String>?, selection: String?, selectionArgs: Array<String>?, sortOrder: String?): Cursor? {
         @NonNls val builder = SQLiteQueryBuilder()
-        when (sUriMatcher.match(uri)) {
+        when (mUriMatcher.match(uri)) {
             CardDBHelper.CARD_COLLECTION_URI_INDICATOR -> builder.tables = CardsTableColumns.TABLE_NAME
             CardDBHelper.SINGLE_CARD_URI_INDICATOR -> {
                 builder.tables = CardsTableColumns.TABLE_NAME
@@ -62,14 +68,14 @@ class CardProvider : ContentProvider() {
         return cursor
     }
 
-    override fun getType(@NonNls uri: Uri): String? = when (sUriMatcher.match(uri)) {
+    override fun getType(@NonNls uri: Uri): String? = when (mUriMatcher.match(uri)) {
         CardDBHelper.CARD_COLLECTION_URI_INDICATOR -> CardDBHelper.CARD_DIR_TYPE
         CardDBHelper.SINGLE_CARD_URI_INDICATOR -> CardDBHelper.CARD_ITEM_TYPE
         else -> throw IllegalArgumentException("Unknown URI: $uri")
     }
 
     override fun insert(@NonNls uri: Uri, values: ContentValues?): Uri? {
-        if (sUriMatcher.match(uri) != CardDBHelper.CARD_COLLECTION_URI_INDICATOR) {
+        if (mUriMatcher.match(uri) != CardDBHelper.CARD_COLLECTION_URI_INDICATOR) {
             throw IllegalArgumentException("Incorrect URI: $uri")
         }
 
@@ -85,7 +91,7 @@ class CardProvider : ContentProvider() {
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?): Int {
         @NonNls val db = mDbHelper!!.writableDatabase
         var count = 0
-        when (sUriMatcher.match(uri)) {
+        when (mUriMatcher.match(uri)) {
             CardDBHelper.CARD_COLLECTION_URI_INDICATOR -> count = db.delete(CardsTableColumns.TABLE_NAME, selection, selectionArgs)
             CardDBHelper.SINGLE_CARD_URI_INDICATOR -> {
                 val rowId = uri.pathSegments[1]
@@ -99,7 +105,7 @@ class CardProvider : ContentProvider() {
 
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<String>?): Int {
         @NonNls val db = mDbHelper!!.writableDatabase
-        val count: Int = when (sUriMatcher.match(uri)) {
+        val count: Int = when (mUriMatcher.match(uri)) {
             CardDBHelper.CARD_COLLECTION_URI_INDICATOR -> db.update(CardsTableColumns.TABLE_NAME, values, selection, selectionArgs)
             CardDBHelper.SINGLE_CARD_URI_INDICATOR -> {
                 val rowId = uri.pathSegments[1]
@@ -118,11 +124,10 @@ class CardProvider : ContentProvider() {
 
         val CONTENT_URI_CARD: Uri = Uri.parse("content://$AUTHORITY/cards")
 
-        private val sUriMatcher = UriMatcher(UriMatcher.NO_MATCH)
-
-        init {
-            sUriMatcher.addURI(AUTHORITY, "cards", CardDBHelper.CARD_COLLECTION_URI_INDICATOR)
-            sUriMatcher.addURI(AUTHORITY, "cards/#", CardDBHelper.SINGLE_CARD_URI_INDICATOR)
-        }
+        internal fun createUriMatcher(authority: String): UriMatcher =
+                UriMatcher(UriMatcher.NO_MATCH).apply {
+                    addURI(authority, "cards", CardDBHelper.CARD_COLLECTION_URI_INDICATOR)
+                    addURI(authority, "cards/#", CardDBHelper.SINGLE_CARD_URI_INDICATOR)
+                }
     }
 }
