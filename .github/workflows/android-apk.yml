@@ -74,6 +74,40 @@ jobs:
             echo "Using an ephemeral debug certificate. Reinstalling a newer CI build may require uninstalling the older personal build."
           fi
 
+      - name: Inject personal EZPay keys for private dev builds
+        if: ${{ github.event.repository.private && github.event_name != 'pull_request' }}
+        shell: bash
+        env:
+          EZPAY_STATIC_KEYS_B64: ${{ secrets.EZPAY_STATIC_KEYS_B64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EZPAY_STATIC_KEYS_B64}" ]]; then
+            echo "No EZPAY_STATIC_KEYS_B64 configured; personal APK will require key import."
+            exit 0
+          fi
+          umask 077
+          mkdir -p src/dev/assets/keys/static
+          printf '%s' "$EZPAY_STATIC_KEYS_B64" | base64 --decode > src/dev/assets/keys/static/tehran-ezpay.json
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+          file = Path("src/dev/assets/keys/static/tehran-ezpay.json")
+          data = json.loads(file.read_text())
+          keys = data.get("keys")
+          if data.get("KeyType") != "MifareClassicStatic" or not isinstance(keys, list) or not keys:
+              raise SystemExit("Invalid MIFARE Classic static-key document")
+          for entry in keys:
+              if (entry.get("type") not in ("KeyA", "KeyB")
+                      or not isinstance(entry.get("sector"), int)
+                      or not 0 <= entry["sector"] <= 39
+                      or not isinstance(entry.get("key"), str)
+                      or re.fullmatch(r"[0-9a-fA-F]{12}", entry["key"]) is None):
+                  raise SystemExit("Invalid MIFARE Classic sector-key entry")
+          print("Personal static-key document validated (values withheld).")
+          PY
+          echo "DEV_EZPAY_KEYS_INCLUDED=1" >> "$GITHUB_ENV"
+
       - name: Verify build environment
         run: |
           java -version
@@ -104,6 +138,29 @@ jobs:
             fi
             echo "Verified packaged provider authority: $authority"
           done
+
+      - name: Verify dev key packaging policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=(build/outputs/apk/dev/*.apk)
+          key_asset="assets/keys/static/tehran-ezpay.json"
+          packaged=0
+          if unzip -Z1 "${apk[0]}" | grep -Fxq "$key_asset"; then
+            packaged=1
+          fi
+          if [[ "${DEV_EZPAY_KEYS_INCLUDED:-0}" == "1" ]]; then
+            if [[ "$packaged" != "1" ]]; then
+              echo "::error::Private personal key asset not packaged into dev APK"
+              exit 1
+            fi
+            echo "Private personal dev key asset packaged; NEVER redistribute this APK."
+          elif [[ "$packaged" == "1" ]]; then
+            echo "::error::Personal keys appeared in an unapproved APK"
+            exit 1
+          else
+            echo "Unkeyed dev APK verified; user key import remains available."
+          fi
 
       - name: Upload dev APK (recommended for phone testing)
         uses: actions/upload-artifact@v4
