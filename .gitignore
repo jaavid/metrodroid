@@ -31,3 +31,7 @@ manifest-merger-release-report.txt
 *_pb2.py
 .~lock*
 .kotlin/
+
+# Local-only MIFARE Classic keys for personal dev builds.
+# Never commit transit-card authentication material.
+/src/dev/assets/keys/
